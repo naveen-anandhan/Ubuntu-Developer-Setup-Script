@@ -74,7 +74,7 @@ fi
 # -------------------------------
 # Step 4: Install MySQL Workbench
 # -------------------------------
-sudo apt install -y mysql-workbench
+sudo apt install -y mysql-workbench-community
 
 #cd ~/Downloads/
 
