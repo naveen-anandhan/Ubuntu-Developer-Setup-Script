@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e  # Exit immediately on error
+# Emergency cleanup of old VS Code repo definitions
+sudo rm -f /etc/apt/sources.list.d/vscode.*
 
 # ------------------------------------------
 # Setup Script: VS Code, MySQL, Python, Edge, git desktop , docker, postman.
@@ -76,6 +78,7 @@ fi
 # -------------------------------
 sudo apt install -y mysql-workbench-community
 
+
 #cd ~/Downloads/
 
 # Check for the .deb file before installing
@@ -88,15 +91,28 @@ sudo apt install -y mysql-workbench-community
 # -------------------------------
 # Step 5: Install VS Code
 # -------------------------------
+
+echo "Cleaning old VS Code repository definitions..."
+#sudo rm -f /etc/apt/sources.list.d/vscode.*
+sudo rm -f /usr/share/keyrings/microsoft.gpg 2>/dev/null || true
+
 sudo apt install -y software-properties-common apt-transport-https wget gpg
 
-wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo gpg --dearmor -o /usr/share/keyrings/packages.microsoft.gpg
+echo "Setting up VS Code repository..."
 
+# Add Microsoft key (only if missing)
+if [ ! -f /usr/share/keyrings/packages.microsoft.gpg ]; then
+  wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | \
+  sudo gpg --dearmor -o /usr/share/keyrings/packages.microsoft.gpg
+fi
+
+# Add repo
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | \
-    sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+  sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
 
-sudo apt update -y
-sudo apt install code -y
+sudo apt update
+sudo apt install -y code
+
 
 # -------------------------------
 # Step 6: Install Python
@@ -106,19 +122,19 @@ sudo apt install -y python3 python3-pip
 # -------------------------------
 # Step 7: Install Microsoft Edge
 # -------------------------------
-echo "Adding Microsoft GPG key..."
-wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | gpg --dearmor > microsoft.gpg
-sudo install -o root -g root -m 644 microsoft.gpg /etc/apt/trusted.gpg.d/
-rm microsoft.gpg
+echo "Setting up Microsoft Edge repository..."
 
-echo "Adding Microsoft Edge repository..."
-echo "deb [arch=amd64] https://packages.microsoft.com/repos/edge stable main" | \
-    sudo tee /etc/apt/sources.list.d/microsoft-edge.list > /dev/null
+# Add Microsoft key only if it doesn't already exist
+if [ ! -f /usr/share/keyrings/microsoft-edge.gpg ]; then
+  wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | \
+  sudo gpg --dearmor -o /usr/share/keyrings/microsoft-edge.gpg
+fi
 
-echo "Updating package list..."
+# Add / refresh repo
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-edge.gpg] https://packages.microsoft.com/repos/edge stable main" | \
+  sudo tee /etc/apt/sources.list.d/microsoft-edge.list > /dev/null
+
 sudo apt update
-
-echo "Installing Microsoft Edge (Stable)..."
 sudo apt install -y microsoft-edge-stable
 
 # -------------------------------
@@ -127,9 +143,22 @@ sudo apt install -y microsoft-edge-stable
 sudo snap install postman
 
 # -------------------------------
-# 9: Install GitHub Desktop
+# 9: Install GitHub Desktop (Shiftkey)
 # -------------------------------
-sudo snap install github-desktop --classic
+echo "Setting up GitHub Desktop repository..."
+
+# Add key only if missing
+if [ ! -f /usr/share/keyrings/shiftkey-packages.gpg ]; then
+  wget -qO - https://apt.packages.shiftkey.dev/gpg.key | \
+  gpg --dearmor | sudo tee /usr/share/keyrings/shiftkey-packages.gpg > /dev/null
+fi
+
+# Add repo
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/shiftkey-packages.gpg] https://apt.packages.shiftkey.dev/ubuntu any main" | \
+  sudo tee /etc/apt/sources.list.d/shiftkey-packages.list > /dev/null
+
+sudo apt update
+sudo apt install -y github-desktop
 
 # -------------------------------
 # 10: Install Docker
