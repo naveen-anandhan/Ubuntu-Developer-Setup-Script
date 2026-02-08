@@ -1,16 +1,14 @@
 #!/bin/bash
-set -e  # Exit immediately on error
-# Emergency cleanup of old VS Code repo definitions
-sudo rm -f /etc/apt/sources.list.d/vscode.*
+set -e
 
 # ------------------------------------------
-# Setup Script: VS Code, MySQL, Python, Edge, git desktop , docker, postman.
+# Setup Script: VS Code, MySQL, Python, Edge, git-desktop, docker, postman.
 # ------------------------------------------
 
-#i have update step 4 if not worked try download and uncomment step 4 then run again
+#I have update step 3 if not worked try download and uncomment step 4 then run again if worked ignore step 1 start at step 2
 # step 1: First download MySQL Workbench installer
-     #   Path : https://dev.mysql.com/downloads/workbench/
-     #    EG:   mysql-workbench-community_8.0.43-1ubuntu22.04_amd64.deb
+#   Path : https://dev.mysql.com/downloads/workbench/
+#   EG:   mysql-workbench-community_8.0.43-1ubuntu22.04_amd64.deb
 
 #step 2: chmod +x setup.sh
 #step 3: ./setup.sh
@@ -18,169 +16,152 @@ sudo rm -f /etc/apt/sources.list.d/vscode.*
 # Script only ask for create new Password for MySQL workbench other then that every thing automatic
 # After that it will reboot you have every thing
 
-# -------------------------------
-# Step 1: Update system packages
-# -------------------------------
-# Recover if any package configuration was interrupted earlier
-sudo dpkg --configure -a || true
+echo "🚀 Starting machine setup..."
+export DEBIAN_FRONTEND=noninteractive
 
 
-sudo apt update -y
-sudo apt upgrade -y
+MYSQL_PASS=""
 
-# -------------------------------
-# Step 2: Install MySQL Server
-# -------------------------------
-sudo apt install mysql-server -y
+if command -v mysql >/dev/null 2>&1 && \
+   sudo mysql -e "SELECT 1 FROM mysql.user WHERE user='Naveen'" >/dev/null 2>&1; then
 
-# Ensure MySQL service is running (usually already started)
-sudo systemctl start mysql || true
-
-# -------------------------------
-# Step 3: Configure MySQL user
-# -------------------------------
-# WARNING: Storing passwords in plaintext is not recommended.
-# Replace 'Naveen' and 'Password' if needed.
-
-if sudo mysql -e "SELECT 1 FROM mysql.user WHERE user='Naveen'" | grep -q 1; then
-    echo "MySQL user already exists. Skipping password setup."
+    echo "✅ MySQL user already exists. Password not needed."
 else
     read -sp "Enter MySQL password for Naveen: " MYSQL_PASS
     echo ""
+fi
 
+# ------------------------------------------------
+# Step 1: System Fix & Update
+# ------------------------------------------------
+sudo dpkg --configure -a || true
+sudo apt update -y
+sudo apt upgrade -y
+sudo systemctl daemon-reload
+
+# ------------------------------------------------
+# Step 2: MySQL Server & User
+# ------------------------------------------------
+sudo apt install -y mysql-server
+sudo systemctl start mysql || true
+
+USER_EXISTS=$(sudo mysql -Nse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user='Naveen' AND host='localhost');")
+
+if [ "$USER_EXISTS" -eq 1 ]; then
+    echo "✅ MySQL user 'Naveen' already exists."
+else
+    echo "👤 Creating MySQL user..."
     sudo mysql -e "CREATE USER 'Naveen'@'localhost' IDENTIFIED BY '$MYSQL_PASS';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'Naveen'@'localhost' WITH GRANT OPTION;"
     sudo mysql -e "FLUSH PRIVILEGES;"
 fi
+#-----------Manual step 3 for downloaded mysql-workbench------------
 
-
-# special case if i want creart user to access my dbs
-                #CREATE USER 'ravi'@'192.168.1.50' IDENTIFIED BY 'SomeStrongPassword';
-                #GRANT ALL PRIVILEGES ON *.* TO 'ravi'@'192.168.1.50';
-                #FLUSH PRIVILEGES;
-
-
-
-# Connection Name: Naveen or Practice
-# Hostname: localhost or 127.0.0.1
-#  Port: 3306
-#  Username: Naveen
-#  Password: Password 
-
-
-
-# -------------------------------
-# Step 4: Install MySQL Workbench
-# ------------------------------- 
-
-# -------------------------------
-# Step 4: Install MySQL Workbench
-# -------------------------------
-sudo apt install -y mysql-workbench-community
-
+#-- after download the mysql-workbench uncomment below and run it again
 
 #cd ~/Downloads/
 
-# Check for the .deb file before installing
 #if ls mysql-workbench-community*.deb 1> /dev/null 2>&1; then
 #    sudo apt install ./mysql-workbench-community*.deb -y
 #else
 #    echo "MySQL Workbench .deb file not found in ~/Downloads. Skipping..."
 #fi
 
-# -------------------------------
-# Step 5: Install VS Code
-# -------------------------------
+# ------------------------------------------------
+# Step 3: MySQL Workbench
+# ------------------------------------------------
+echo "Installing MySQL Workbench..."
+sudo snap install mysql-workbench-community || true
 
-echo "Cleaning old VS Code repository definitions..."
-#sudo rm -f /etc/apt/sources.list.d/vscode.*
-sudo rm -f /usr/share/keyrings/microsoft.gpg 2>/dev/null || true
+# ------------------------------------------------
+# Step 4: VS Code
+# ------------------------------------------------
+echo "Installing VS Code..."
+sudo rm -f /etc/apt/sources.list.d/vscode.*
 
-sudo apt install -y software-properties-common apt-transport-https wget gpg
-
-echo "Setting up VS Code repository..."
-
-# Add Microsoft key (only if missing)
 if [ ! -f /usr/share/keyrings/packages.microsoft.gpg ]; then
-  wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | \
-  sudo gpg --dearmor -o /usr/share/keyrings/packages.microsoft.gpg
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | \
+    sudo gpg --dearmor -o /usr/share/keyrings/packages.microsoft.gpg
 fi
 
-# Add repo
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | \
-  sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
 
 sudo apt update
 sudo apt install -y code
 
+# ------------------------------------------------
+# Step 5: Microsoft Edge
+# ------------------------------------------------
+echo "Installing Microsoft Edge..."
+sudo rm -f /etc/apt/sources.list.d/microsoft-edge.list
 
-# -------------------------------
-# Step 6: Install Python
-# -------------------------------
-sudo apt install -y python3 python3-pip
-
-# -------------------------------
-# Step 7: Install Microsoft Edge
-# -------------------------------
-echo "Setting up Microsoft Edge repository..."
-
-# Add Microsoft key only if it doesn't already exist
 if [ ! -f /usr/share/keyrings/microsoft-edge.gpg ]; then
-  wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | \
-  sudo gpg --dearmor -o /usr/share/keyrings/microsoft-edge.gpg
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | \
+    sudo gpg --dearmor -o /usr/share/keyrings/microsoft-edge.gpg
 fi
 
-# Add / refresh repo
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-edge.gpg] https://packages.microsoft.com/repos/edge stable main" | \
-  sudo tee /etc/apt/sources.list.d/microsoft-edge.list > /dev/null
+sudo tee /etc/apt/sources.list.d/microsoft-edge.list > /dev/null
 
 sudo apt update
 sudo apt install -y microsoft-edge-stable
 
-# -------------------------------
-# 8 : Install Postman
-# -------------------------------
-sudo snap install postman
+# ------------------------------------------------
+# Step 6: GitHub Desktop
+# ------------------------------------------------
+echo "Installing GitHub Desktop..."
+if ! dpkg -l | grep -q github-desktop; then
+    LATEST_URL=$(curl -s https://api.github.com/repos/shiftkey/desktop/releases/latest | \
+        grep browser_download_url | grep linux-amd64 | grep .deb | head -n 1 | cut -d '"' -f 4)
 
-# -------------------------------
-# 9: Install GitHub Desktop (Shiftkey)
-# -------------------------------
-echo "Setting up GitHub Desktop repository..."
-
-# Add key only if missing
-if [ ! -f /usr/share/keyrings/shiftkey-packages.gpg ]; then
-  wget -qO - https://apt.packages.shiftkey.dev/gpg.key | \
-  gpg --dearmor | sudo tee /usr/share/keyrings/shiftkey-packages.gpg > /dev/null
+    if [ -n "$LATEST_URL" ]; then
+        wget -q -O /tmp/github-desktop.deb "$LATEST_URL"
+        sudo apt install -y /tmp/github-desktop.deb
+        rm /tmp/github-desktop.deb
+    else
+        echo "⚠️ Could not fetch GitHub Desktop."
+    fi
+else
+    echo "✅ GitHub Desktop already installed."
 fi
 
-# Add repo
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/shiftkey-packages.gpg] https://apt.packages.shiftkey.dev/ubuntu any main" | \
-  sudo tee /etc/apt/sources.list.d/shiftkey-packages.list > /dev/null
+# ------------------------------------------------
+# Step 7: Docker Engine + Desktop
+# ------------------------------------------------
+echo "Installing Docker..."
+sudo rm -f /etc/apt/sources.list.d/docker.list
 
-sudo apt update
-sudo apt install -y github-desktop
-
-# -------------------------------
-# 10: Install Docker
-# -------------------------------
 sudo apt install -y ca-certificates curl gnupg
-
 sudo install -m 0755 -d /etc/apt/keyrings
 
+[ ! -f /etc/apt/keyrings/docker.gpg ] && \
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# allow current user to run docker without sudo
+echo "Installing Docker Desktop..."
+wget -q -O /tmp/docker-desktop.deb https://desktop.docker.com/linux/main/amd64/docker-desktop-amd64.deb
+sudo apt install -y /tmp/docker-desktop.deb
+rm /tmp/docker-desktop.deb
+
 sudo usermod -aG docker $USER
 
+# ------------------------------------------------
+# Step 8: Python Essentials
+# ------------------------------------------------
+sudo apt install -y python3 python3-pip python3-venv
+
+# ------------------------------------------------
+# Final Polish
+# ------------------------------------------------
+sudo snap install postman || true
+sudo apt autoremove -y
 
 # -------------------------------
 # Step 8: Confirmation Messages
@@ -191,7 +172,6 @@ echo "🛠 MySQL Server and Workbench installed."
 echo "📝 VS Code installed."
 echo "🐍 Python installed."
 echo "🌐 Microsoft Edge installed."
-echo ""
 echo "GitHub desktop installed"
 echo "Postman installed"
 echo "Docker installed"
